@@ -1,4 +1,4 @@
-import { callCIAMToOptOut } from '../../../../lib/ciam.js';
+const { callCIAMToOptOut } = require('../../../../lib/ciam.js');
 
 export default async function handler(req, res) {
   // Set CORS headers
