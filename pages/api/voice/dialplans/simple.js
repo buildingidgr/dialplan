@@ -19,13 +19,12 @@ export default function handler(req, res) {
   // Set content type to JSON
   res.setHeader('Content-Type', 'application/json');
 
-  // Return a simple dialplan with just a SAY verb
+  // Return a simple dialplan with just a PLAY verb
   const response = {
     verbs: [
       {
-        type: "SAY",
-        text: "Hello, this is a test message from the simple dialplan. Thank you for calling.",
-        language: "en-US",
+        type: "PLAY",
+        fileURL: "https://waymore.io/recordings/welcome_message.wav",
         bargeIn: false
       }
     ]
