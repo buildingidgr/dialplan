@@ -24,7 +24,7 @@ export default function handler(req, res) {
     verbs: [
       {
         type: "PLAY",
-        fileURL: "https://waymore.io/recordings/Opt_out_Voice_message_upon_dialling_TFN.wav",
+        fileURL: "https://cdn12.waymore.io/s/pTXaaw7KDLcjBnt/download/1.wav",
         bargeIn: false
       },
       {

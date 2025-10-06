@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         verbs: [
           {
             type: "PLAY",
-            fileURL: "https://waymore.io/recordings/no_input.wav",
+            fileURL: "https://cdn12.waymore.io/s/299WXiedo2wCp2y/download/4.wav",
             bargeIn: false
           }
         ]
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
         verbs: [
           {
             type: "PLAY",
-            fileURL: "https://waymore.io/recordings/opt_out_confirmed.wav",
+            fileURL: "https://cdn12.waymore.io/s/Aw9oidNF2oxAppq/download/5.wav",
             bargeIn: false
           }
         ]
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
         verbs: [
           {
             type: "PLAY",
-            fileURL: "https://waymore.io/recordings/first_invalid_opt_out.wav",
+            fileURL: "https://cdn12.waymore.io/s/ezLYj4bpG6mmBty/download/2.wav",
             bargeIn: false
           },
           {
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
         verbs: [
           {
             type: "PLAY",
-            fileURL: "https://waymore.io/recordings/second_invalid_opt_out.wav",
+            fileURL: "https://cdn12.waymore.io/s/Z78YoYbRwjMMZBk/download/3.wav",
             bargeIn: false
           }
         ]
