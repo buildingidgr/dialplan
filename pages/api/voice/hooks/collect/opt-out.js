@@ -76,14 +76,13 @@ export default async function handler(req, res) {
           },
           {
             type: "PAUSE",
-            length: 2
+            length: 7
           },
           {
             type: "COLLECT",
             eventUrl: `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://YOUR-VERCEL-APP.vercel.app'}/api/voice/hooks/collect/opt-out?attempt=2`,
             submitOnHash: true,
-            maxDigits: 1,
-            timeout: 7
+            maxDigits: 30
           }
         ]
       });
