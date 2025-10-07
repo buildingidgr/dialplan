@@ -547,32 +547,12 @@ END FUNCTION
 
 ## Routee Integration
 
-### Configuration Steps
-
-1. **Routee Dashboard Setup**
-   - Log into Routee dashboard
-   - Navigate to Voice > Applications
-   - Create new application or edit existing
-
-2. **Application Settings**
-   - **Name**: "SMS Opt-Out IVR"
-   - **Type**: Inbound Voice
-   - **Voice URL**: `https://YOUR-DOMAIN.com/api/voice/dialplans/opt-out/initial`
-   - **Method**: POST (GET also supported for testing)
-   - **Fallback URL**: Same as Voice URL (optional)
-
-3. **Number Assignment**
-   - Purchase or select toll-free number
-   - Assign to the voice application
-   - Test by calling the number
-
 ### Important Routee Behaviors
 
-⚠️ **Critical**: Routee has specific behaviors you must handle:
+⚠️ **Hash Key behaviour**: Routee has specific behaviors you must handle:
 
-1. **Field Name**: Routee sends collected digits as `collectedTones`, not `digits`
 
-2. **Hash Key Requirement**: 
+1. **Hash Key Requirement**: 
    - When `submitOnHash: true` is set, Routee **will NOT POST to the eventURL** unless the user presses the hash key (`#`)
    - **This means**: If a user presses "1" but forgets to press "#", you will receive NO webhook call
    - The PAUSE verb will complete, the fallback PLAY will execute, and the call will end
