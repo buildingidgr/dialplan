@@ -523,9 +523,20 @@ END FUNCTION
 ⚠️ **Critical**: Routee has specific behaviors you must handle:
 
 1. **Field Name**: Routee sends collected digits as `collectedTones`, not `digits`
-2. **Empty Input**: Routee posts `collectedTones: ""` even when user doesn't press anything
-3. **Timing**: If call ends before PAUSE completes, Routee may not POST to webhook
-4. **Hash Key**: `submitOnHash: true` means user must press `#` to submit input
+
+2. **Hash Key Requirement**: 
+   - When `submitOnHash: true` is set, Routee **will NOT POST to the eventURL** unless the user presses the hash key (`#`)
+   - **This means**: If a user presses "1" but forgets to press "#", you will receive NO webhook call
+   - The PAUSE verb will complete, the fallback PLAY will execute, and the call will end
+   - **Developer Impact**: You cannot track partial input. You'll only receive complete submissions (with #) or empty/timeout submissions
+   - **User Instructions**: Always instruct users to "press 1 followed by the hash key" in your audio messages
+
+3. **Empty Input Behavior**: 
+   - After the PAUSE duration completes without hash key press, Routee posts `collectedTones: ""`
+   - This happens even if the user pressed digits but didn't press "#"
+   - Treat empty `collectedTones` as invalid input to give users another chance
+
+4. **Timing**: If call ends before PAUSE completes, Routee may not POST to webhook at all
 
 ### Solution for Timing Issue
 
@@ -534,6 +545,56 @@ The dialplan structure `PLAY → COLLECT → PAUSE → PLAY` ensures:
 - If user presses "1#", Routee interrupts and POSTs to webhook
 - If no input, fallback PLAY executes and call ends gracefully
 - This prevents premature call termination
+
+### Hash Key Behavior - Visual Explanation
+
+```
+Scenario 1: User presses "1#" (CORRECT)
+───────────────────────────────────────
+PLAY (welcome) → COLLECT starts → User presses "1#"
+                                      ↓
+                        Routee immediately POSTs to webhook
+                                      ↓
+                        POST { "collectedTones": "1" }
+                                      ↓
+                        Webhook returns PLAY(confirmation)
+                                      ↓
+                        Call ends with confirmation
+
+
+Scenario 2: User presses "1" without "#" (MISSING HASH)
+────────────────────────────────────────────────────────
+PLAY (welcome) → COLLECT starts → User presses "1" (no #)
+                                      ↓
+                        Routee waits... (no POST sent yet)
+                                      ↓
+                        PAUSE begins (7 seconds)
+                                      ↓
+                        PAUSE completes
+                                      ↓
+                        Routee POSTs { "collectedTones": "" }
+                                      ↓
+                        Treated as invalid/timeout
+                                      ↓
+                        Returns retry message or end call
+
+
+Scenario 3: User presses nothing
+──────────────────────────────────
+PLAY (welcome) → COLLECT starts → User silent
+                                      ↓
+                        PAUSE begins (7 seconds)
+                                      ↓
+                        PAUSE completes
+                                      ↓
+                        Routee POSTs { "collectedTones": "" }
+                                      ↓
+                        Treated as invalid/timeout
+                                      ↓
+                        Returns retry message or end call
+```
+
+**Key Takeaway**: Without the hash key, Scenarios 2 and 3 look identical to your webhook. You cannot distinguish between "user pressed 1 but forgot #" vs "user pressed nothing". Both result in empty `collectedTones`.
 
 ---
 
@@ -1396,25 +1457,43 @@ logToMonitoring("opt-out-invalid", { phoneNumber: from, attempt: attempt, input:
 **Symptoms**: 
 - Routee always posts `collectedTones: ""`
 - Even when user reports pressing "1"
+- No webhook POST received when user presses digit without "#"
 
 **Diagnostic Steps**:
 1. Check if `submitOnHash` is set to `true`
 2. Verify PAUSE duration is adequate (7 seconds recommended)
-3. Test with different phone devices
-4. Check audio quality of instruction message
+3. Ask user if they pressed the hash (#) key
+4. Test yourself by calling and pressing "1" without "#"
+5. Check audio quality of instruction message
+
+**Root Cause**:
+⚠️ **Most Common**: User is pressing "1" but **NOT pressing the hash key (#)**
+
+When `submitOnHash: true`:
+- Routee **will NOT POST** to webhook until "#" is pressed
+- If "#" is never pressed, Routee waits through entire PAUSE duration
+- After PAUSE completes, Routee posts `collectedTones: ""` (empty)
+- From your webhook's perspective, this looks like "no input"
 
 **Possible Causes**:
-- User not pressing hash key
-- COLLECT timeout too short
-- Phone keypad not sending DTMF tones correctly
-- Poor audio quality making instructions unclear
+1. **User not pressing hash key** (MOST COMMON - 90% of cases)
+2. Audio instructions not clear about hash key requirement
+3. Phone keypad not sending DTMF tones correctly
+4. Poor audio quality making instructions unclear
+5. PAUSE duration too short (user hasn't finished input)
 
 **Solutions**:
-1. Ensure `submitOnHash: true` in COLLECT verb
-2. Increase PAUSE duration if needed
-3. Test with multiple phone types (mobile, landline)
-4. Review audio message clarity
-5. Verify DTMF tone compatibility with Routee
+1. **Make hash key instruction VERY clear in audio**:
+   - ✅ "Please press 1 followed by the hash key"
+   - ✅ "Press 1, then press the hash or pound key"
+   - ❌ "Please press 1" (missing hash instruction)
+2. Ensure `submitOnHash: true` in COLLECT verb
+3. Consider adding example in audio: "For example, press one, then hash"
+4. Increase PAUSE duration to 10+ seconds if users need more time
+5. Test with multiple phone types (mobile, landline)
+6. Review audio message volume and clarity
+7. Add SAY verb before COLLECT repeating hash key instruction
+8. Consider alternative: `submitOnHash: false` with `maxDigits: 1` (no hash required, but less standard)
 
 ---
 
@@ -2010,7 +2089,24 @@ A: Yes. The current implementation allows 2 attempts. You can modify the logic t
 A: Routee requires a higher maxDigits value to properly detect input with `submitOnHash`. Setting it to 1 may cause issues with hash key detection.
 
 **Q: What if user presses "1" without pressing "#"?**  
-A: With `submitOnHash: true`, the system waits for the "#" key. If the user only presses "1", Routee will wait until timeout or "#" is pressed.
+A: **CRITICAL**: With `submitOnHash: true`, Routee will **NOT POST to the eventURL** at all if the hash key is not pressed. 
+
+**What happens**:
+1. User presses "1" (no hash)
+2. PAUSE duration completes (7 seconds)
+3. Fallback PLAY executes (no-input or invalid message)
+4. Call ends
+5. **No webhook POST is sent** - you never receive the "1" that was pressed
+
+**What you receive instead**:
+- After PAUSE completes without "#", Routee posts `collectedTones: ""` (empty)
+- Your system treats this as invalid input and gives a retry
+
+**Developer Implications**:
+- You cannot detect partial input (digits without #)
+- You only receive either complete submissions (with #) or timeout submissions (empty)
+- This is why clear audio instructions saying "press 1 followed by the hash key" are essential
+- Monitor dashboard will only show completed submissions or timeouts, never partial input
 
 **Q: Can we support multiple valid options (1, 2, 3, etc.)?**  
 A: Yes. Modify the validation logic to check `collectedTones IN ["1", "2", "3"]` and route accordingly. You'll need different CIAM calls for each option.
