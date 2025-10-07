@@ -58,7 +58,7 @@ export default async function handler(req, res) {
         verbs: [
           {
             type: "PLAY",
-            fileURL: "https://cdn12.waymore.io/s/Aw9oidNF2oxAppq/download/5.wav",
+            fileURL: "https://cdn12.waymore.io/s/btzr8e5RDADzR9p/download/5.wav",
             bargeIn: false
           }
         ]

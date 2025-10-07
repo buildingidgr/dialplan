@@ -41,7 +41,16 @@ export default function handler(req, res) {
       },
       {
         type: "PLAY",
-        fileURL: "https://cdn12.waymore.io/s/299WXiedo2wCp2y/download/4.wav",
+        fileURL: "https://cdn12.waymore.io/s/drnETsbAfpbRPos/download/4.wav",
+        bargeIn: false
+      },
+      {
+        type: "PAUSE",
+        duration: 7
+      },
+      {
+        type: "PLAY",
+        fileURL: "https://cdn12.waymore.io/s/NcB6E9Deaecnp94/download/6.wav",
         bargeIn: false
       }
     ]
