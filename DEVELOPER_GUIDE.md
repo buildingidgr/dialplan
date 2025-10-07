@@ -532,9 +532,10 @@ END FUNCTION
    - **User Instructions**: Always instruct users to "press 1 followed by the hash key" in your audio messages
 
 3. **Empty Input Behavior**: 
-   - After the PAUSE duration completes without hash key press, Routee posts `collectedTones: ""`
-   - This happens even if the user pressed digits but didn't press "#"
-   - Treat empty `collectedTones` as invalid input to give users another chance
+   - Routee posts `collectedTones: ""` **when the call ends**
+   - This happens if the user doesn't press "#" before the dialplan completes
+   - The PAUSE → fallback PLAY sequence keeps the call alive long enough for users to respond
+   - Empty `collectedTones` indicates the user didn't complete input (either pressed digits without "#" or pressed nothing at all)
 
 4. **Timing**: If call ends before PAUSE completes, Routee may not POST to webhook at all
 
@@ -566,35 +567,63 @@ Scenario 2: User presses "1" without "#" (MISSING HASH)
 ────────────────────────────────────────────────────────
 PLAY (welcome) → COLLECT starts → User presses "1" (no #)
                                       ↓
-                        Routee waits... (no POST sent yet)
+                        Routee waits... (no POST sent)
                                       ↓
                         PAUSE begins (7 seconds)
                                       ↓
+                        User does nothing OR presses more digits (no #)
+                                      ↓
                         PAUSE completes
+                                      ↓
+                        Fallback PLAY starts (no-input message)
+                                      ↓
+                        Fallback PLAY completes
+                                      ↓
+                        **Call ends - dialplan complete**
                                       ↓
                         Routee POSTs { "collectedTones": "" }
                                       ↓
-                        Treated as invalid/timeout
-                                      ↓
-                        Returns retry message or end call
+                        Webhook receives empty input
+                        (but call already ended - too late to respond)
 
 
 Scenario 3: User presses nothing
 ──────────────────────────────────
 PLAY (welcome) → COLLECT starts → User silent
                                       ↓
+                        Routee waits...
+                                      ↓
                         PAUSE begins (7 seconds)
+                                      ↓
+                        User still silent
                                       ↓
                         PAUSE completes
                                       ↓
+                        Fallback PLAY starts (no-input message)
+                                      ↓
+                        Fallback PLAY completes
+                                      ↓
+                        **Call ends - dialplan complete**
+                                      ↓
                         Routee POSTs { "collectedTones": "" }
                                       ↓
-                        Treated as invalid/timeout
-                                      ↓
-                        Returns retry message or end call
+                        Webhook receives empty input
+                        (but call already ended - too late to respond)
 ```
 
-**Key Takeaway**: Without the hash key, Scenarios 2 and 3 look identical to your webhook. You cannot distinguish between "user pressed 1 but forgot #" vs "user pressed nothing". Both result in empty `collectedTones`.
+**Key Takeaways**: 
+- Routee only POSTs when the **call ends** or when user presses "#"
+- Without hash key, Scenarios 2 and 3 are identical to your webhook
+- The empty `collectedTones` POST arrives **after the call has ended**
+- You cannot respond to empty submissions - the fallback PLAY already executed
+- This is why the fallback PLAY is essential - it handles the no-input case within the call flow
+
+**Important for Developers**:
+- When you receive `collectedTones: ""`, the call has already ended
+- Your webhook response will be **ignored** by Routee (call is over)
+- This POST is informational only - log it for analytics but don't try to respond
+- The actual user experience was already handled by the fallback PLAY in the dialplan
+- This is why we include fallback audio in the initial dialplan structure
 
 ---
 
@@ -1471,9 +1500,10 @@ logToMonitoring("opt-out-invalid", { phoneNumber: from, attempt: attempt, input:
 
 When `submitOnHash: true`:
 - Routee **will NOT POST** to webhook until "#" is pressed
-- If "#" is never pressed, Routee waits through entire PAUSE duration
-- After PAUSE completes, Routee posts `collectedTones: ""` (empty)
-- From your webhook's perspective, this looks like "no input"
+- If "#" is never pressed, Routee waits through entire dialplan (COLLECT → PAUSE → fallback PLAY)
+- **When the call ends** (after fallback PLAY completes), Routee posts `collectedTones: ""` (empty)
+- This empty POST arrives **after** the call has already ended, so your webhook response is ignored
+- From your logs, this looks like "no input", but the user may have pressed "1" (you can't tell)
 
 **Possible Causes**:
 1. **User not pressing hash key** (MOST COMMON - 90% of cases)

@@ -29,6 +29,15 @@ export default async function handler(req, res) {
 
     console.log(`Collect webhook called - attempt: ${attempt}, collectedTones: "${collectedTones}"`);
     console.log(`Full request body:`, JSON.stringify(req.body));
+    
+    // Note: If collectedTones is empty, the call has already ended
+    // This POST is informational only - our response will be ignored
+    if (!collectedTones || collectedTones === '') {
+      console.log('Empty collectedTones received - call already ended, logging for analytics only');
+      const response = { message: 'Call already ended, no action needed' };
+      logRequest('/api/voice/hooks/collect/opt-out', req.method, req.body, req.query, req.headers, response);
+      return res.status(200).json(response);
+    }
 
     // Valid input (collectedTones === "1")
     if (collectedTones === "1") {
