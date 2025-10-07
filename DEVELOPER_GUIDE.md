@@ -128,23 +128,24 @@ End Call      ↓              │               │
 
 ## Routee Integration
 
-### Step 1: Configure Routee Application
+### Step 1: Configure Routee Number
 
 1. **Log into Routee Dashboard**
-   - Navigate to Voice > Applications
+   - Go to Voice > Numbers
 
-2. **Create/Configure Voice Application**
-   - Application Type: `Inbound Voice`
-   - Voice URL (Initial Dialplan): 
+2. **Purchase or Select Existing Number**
+   - Purchase a new Routee voice number, or
+   - Select an existing number from your inventory
+
+3. **Configure Inbound Call Settings**
+   - Click on the number to edit settings
+   - Navigate to **Inbound Call Settings** section
+   - In the **Forward to** dropdown, select: `Dialplan`
+   - In the **Dialplan URL** field, enter:
      ```
      https://YOUR-DOMAIN.com/api/voice/dialplans/opt-out/initial
      ```
-   - HTTP Method: `GET` or `POST` (both should be supported)
-   - Voice Fallback URL: (Optional) Same URL for redundancy
-
-3. **Assign Routee Number**
-   - Purchase or assign a Routee voice number
-   - Link the number to your Voice Application
+   - Save the configuration
 
 ### Step 2: Verify Configuration
 
