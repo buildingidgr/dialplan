@@ -35,7 +35,7 @@ export default function handler(req, res) {
       },
       {
         type: "PAUSE",
-        length: 7 // seconds
+        duration: 7 // seconds
       }
     ]
   };

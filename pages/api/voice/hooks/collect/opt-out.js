@@ -82,7 +82,7 @@ export default async function handler(req, res) {
           },
           {
             type: "PAUSE",
-            length: 7
+            duration: 7
           }
         ]
       });
