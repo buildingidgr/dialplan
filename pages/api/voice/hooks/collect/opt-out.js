@@ -30,22 +30,6 @@ export default async function handler(req, res) {
     console.log(`Collect webhook called - attempt: ${attempt}, collectedTones: "${collectedTones}"`);
     console.log(`Full request body:`, JSON.stringify(req.body));
 
-    // No input (empty collectedTones or timeout)
-    if (!collectedTones || collectedTones === '') {
-      console.log('No input received, playing no_input.wav');
-      const response = {
-        verbs: [
-          {
-            type: "PLAY",
-            fileURL: "https://cdn12.waymore.io/s/299WXiedo2wCp2y/download/4.wav",
-            bargeIn: false
-          }
-        ]
-      };
-      logRequest('/api/voice/hooks/collect/opt-out', req.method, req.body, req.query, req.headers, response);
-      return res.status(200).json(response);
-    }
-
     // Valid input (collectedTones === "1")
     if (collectedTones === "1") {
       console.log('Valid opt-out input received, calling CIAM');
@@ -74,9 +58,10 @@ export default async function handler(req, res) {
       return res.status(200).json(response);
     }
 
-    // Invalid input handling
+    // Invalid input handling (including empty collectedTones)
+    // Routee posts empty collectedTones even when user doesn't press anything
     if (attempt === 1) {
-      console.log('Invalid input on first attempt, retrying');
+      console.log(`Invalid input on first attempt (collectedTones: "${collectedTones}"), retrying`);
       const response = {
         verbs: [
           {
@@ -100,7 +85,7 @@ export default async function handler(req, res) {
       return res.status(200).json(response);
     } else {
       // Invalid input on second attempt
-      console.log('Invalid input on second attempt, ending call');
+      console.log(`Invalid input on second attempt (collectedTones: "${collectedTones}"), ending call`);
       const response = {
         verbs: [
           {
