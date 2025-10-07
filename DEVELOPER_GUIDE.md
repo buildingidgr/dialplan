@@ -16,7 +16,7 @@
 
 ## Overview
 
-This voice opt-out flow allows customers to opt out of SMS campaigns by calling a toll-free number and pressing "1" followed by the hash key. The system provides clear voice instructions, handles invalid inputs with retry logic, and integrates with your CIAM system to register opt-outs.
+This voice opt-out flow allows customers to opt out of SMS campaigns by calling a Routee number and pressing "1" followed by the hash key. The system provides clear voice instructions, handles invalid inputs with retry logic, and integrates with your CIAM system to register opt-outs.
 
 ### Key Features
 - ✅ Two-attempt retry logic for invalid inputs
@@ -33,7 +33,7 @@ This voice opt-out flow allows customers to opt out of SMS campaigns by calling 
 ### Call Flow Overview
 
 ```
-User Calls Toll-Free Number
+User Calls Routee Number
     ↓
 Welcome Message
 "Press 1 followed by hash to opt out"
@@ -79,7 +79,7 @@ End Call      ↓              │               │
 ```
 ┌─────────────────┐
 │  Customer Calls │
-│   Toll-Free #   │
+│  Routee Number  │
 └────────┬────────┘
          │
          ↓
@@ -142,8 +142,8 @@ End Call      ↓              │               │
    - HTTP Method: `GET` or `POST` (both should be supported)
    - Voice Fallback URL: (Optional) Same URL for redundancy
 
-3. **Assign Toll-Free Number**
-   - Purchase or assign a toll-free number
+3. **Assign Routee Number**
+   - Purchase or assign a Routee voice number
    - Link the number to your Voice Application
 
 ### Step 2: Verify Configuration
@@ -246,7 +246,7 @@ Expected response structure:
 
 **Field Descriptions**:
 - `from`: Caller's phone number (E.164 format)
-- `to`: Your toll-free number (E.164 format)
+- `to`: Your Routee number (E.164 format)
 - `messageId`: Unique Routee message identifier
 - `conversationTrackingId`: Routee conversation tracking identifier
 - `collectedTones`: Digits pressed by user (empty string if no input)
@@ -1328,14 +1328,14 @@ CIAM_API_KEY=your-secret-api-key
 ### Manual Testing via Phone
 
 1. **Test Valid Opt-Out**:
-   - Call your configured toll-free number
+   - Call your configured Routee number
    - Wait for welcome message
    - Press: `1` then `#`
    - Expected: Hear confirmation message
    - Verify: Check CIAM system for registered opt-out
 
 2. **Test Invalid Input with Retry**:
-   - Call toll-free number
+   - Call Routee number
    - Press: `9` then `#` (any digit except "1")
    - Expected: Hear retry message
    - Press: `1` then `#`
@@ -1343,14 +1343,14 @@ CIAM_API_KEY=your-secret-api-key
    - Verify: Check CIAM system for registered opt-out
 
 3. **Test Second Invalid**:
-   - Call toll-free number
+   - Call Routee number
    - Press: `9` then `#`
    - Expected: Hear retry message
    - Press: `5` then `#` (any digit except "1")
    - Expected: Hear "call ended" message
 
 4. **Test No Input (Timeout)**:
-   - Call toll-free number
+   - Call Routee number
    - Don't press anything
    - Wait 7+ seconds
    - Expected: Hear retry message (attempt 1) or end call message (attempt 2)
