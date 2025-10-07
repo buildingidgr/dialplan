@@ -76,6 +76,10 @@ export default async function handler(req, res) {
             maxDigits: 30
           },
           {
+            type: "PAUSE",
+            duration: 7
+          },
+          {
             type: "PLAY",
             fileURL: "https://cdn12.waymore.io/s/Z78YoYbRwjMMZBk/download/3.wav",
             bargeIn: false
