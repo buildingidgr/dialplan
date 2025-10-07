@@ -9,19 +9,29 @@ This project implements a complete voice opt-out flow for Routee telephony servi
 ## Features
 
 - 🎯 **Interactive Voice Response (IVR)** - Multi-step voice prompts with user input collection
-- 🔄 **Retry Logic** - Handles invalid inputs with retry attempts
+- 🔄 **Two-Attempt Retry Logic** - Handles invalid inputs with retry attempts
 - 📞 **CIAM Integration** - Stub function ready for Customer Identity and Access Management
 - 🚀 **Serverless Architecture** - Built for Vercel deployment
-- 📊 **Comprehensive Logging** - Full request/response logging for debugging
+- 📊 **Real-time Monitoring Dashboard** - Live request/response monitoring at `/monitor`
+- 🔍 **Comprehensive Logging** - Full request/response logging for debugging
 - 🌐 **CORS Support** - Cross-origin request handling
+- ⏱️ **Hash Key Detection** - Proper handling of Routee's `submitOnHash` behavior
+- 🎵 **Audio Fallback Handling** - Graceful timeout and no-input scenarios
+
+## Quick Start
+
+1. **Deploy to Vercel** (see [Deployment](#deployment) section)
+2. **Configure Routee** number with your Dialplan URL
+3. **Test** by calling your Routee number
+4. **Monitor** at `/monitor` dashboard
 
 ## API Endpoints
 
-### 1. Initial Dialplan
+### 1. Initial Dialplan (Dialplan URL)
 **Endpoint:** `POST /api/voice/dialplans/opt-out/initial`  
 **Method:** `POST` (also accepts `GET` for testing)
 
-Returns the initial voice prompt and input collection setup.
+This is the Dialplan URL configured in your Routee number settings. Returns the initial voice prompt and input collection setup.
 
 **Response:**
 ```json
@@ -29,53 +39,131 @@ Returns the initial voice prompt and input collection setup.
   "verbs": [
     {
       "type": "PLAY",
-      "fileURL": "https://waymore.io/recordings/Opt_out_Voice_message_upon_dialling_TFN.wav",
+      "fileURL": "https://cdn12.waymore.io/s/pTXaaw7KDLcjBnt/download/1.wav",
       "bargeIn": false
     },
     {
       "type": "COLLECT",
       "eventUrl": "https://YOUR-VERCEL-APP.vercel.app/api/voice/hooks/collect/opt-out?attempt=1",
-      "submitOnHash": true
+      "submitOnHash": true,
+      "maxDigits": 30
+    },
+    {
+      "type": "PAUSE",
+      "duration": 7
+    },
+    {
+      "type": "PLAY",
+      "fileURL": "https://cdn12.waymore.io/s/yWCEeCTLFK5dQ7Y/download/4.wav",
+      "bargeIn": false
+    },
+    {
+      "type": "PAUSE",
+      "duration": 7
+    },
+    {
+      "type": "PLAY",
+      "fileURL": "https://cdn12.waymore.io/s/NcB6E9Deaecnp94/download/6.wav",
+      "bargeIn": false
     }
   ]
 }
 ```
 
-### 2. Collect Webhook
+**Verb Sequence Explanation:**
+1. **PLAY** - Welcome message (File 1)
+2. **COLLECT** - Wait for user to press keys, submit on # press
+3. **PAUSE** - Give user 7 seconds to respond
+4. **PLAY** - First no-input/timeout message (File 4)
+5. **PAUSE** - Give user another 7 seconds to respond  
+6. **PLAY** - Final no-input/timeout message (File 6)
+
+**Total Time:** Up to 14 seconds for user to respond (2 × 7-second pauses)
+
+### 2. Collect Endpoint (eventURL)
 **Endpoint:** `POST /api/voice/hooks/collect/opt-out`  
 **Method:** `POST`  
 **Query Parameters:** `attempt=1|2`
 
-Handles user input and manages the opt-out flow logic.
+This is the eventURL endpoint that handles collected tones from Routee and manages the opt-out flow logic.
 
 **Request Body:**
 ```json
 {
-  "digits": "1"
+  "collectedTones": "1",
+  "from": "+1234567890",
+  "to": "+1800XXXYYYY",
+  "messageId": "unique-message-id",
+  "conversationTrackingId": "unique-conversation-id"
 }
 ```
 
 **Flow Logic:**
-- **No Input:** Plays `no_input.wav`
-- **Valid Input (digits="1"):** Calls CIAM and plays confirmation
+- **No Input (collectedTones=""):** Logs for analytics (call already ended)
+- **Valid Input (collectedTones="1"):** Calls CIAM and plays confirmation
 - **Invalid Input (attempt=1):** Plays retry message and collects again
 - **Invalid Input (attempt=2):** Plays final invalid message
+
+### 3. Monitoring Logs API
+**Endpoint:** `GET /api/monitor/logs`  
+**Method:** `GET`
+
+Returns all logged requests for monitoring and debugging.
+
+**Response:**
+```json
+{
+  "count": 15,
+  "logs": [
+    {
+      "id": 1728394823.456,
+      "timestamp": "2025-10-07T09:30:23.456Z",
+      "endpoint": "/api/voice/hooks/collect/opt-out",
+      "method": "POST",
+      "body": { "collectedTones": "1", ... },
+      "query": { "attempt": "1" },
+      "response": { "verbs": [...] }
+    }
+  ]
+}
+```
+
+### 4. Health Check
+**Endpoint:** `GET /api/ping`  
+**Method:** `GET`
+
+Simple health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-10-07T09:30:23.456Z"
+}
+```
 
 ## Project Structure
 
 ```
 ├── lib/
-│   └── ciam.js                           # CIAM integration function
+│   ├── ciam.js                           # CIAM integration function
+│   └── requestLogger.js                  # Request logging utility
 ├── pages/
-│   └── api/
-│       └── voice/
-│           ├── dialplans/
-│           │   └── opt-out/
-│           │       └── initial.js         # Initial dialplan endpoint
-│           └── hooks/
-│               └── collect/
-│                   └── opt-out.js         # Collect webhook endpoint
-└── README.md
+│   ├── api/
+│   │   ├── monitor/
+│   │   │   └── logs.js                   # Monitoring logs API
+│   │   ├── ping.js                       # Health check endpoint
+│   │   └── voice/
+│   │       ├── dialplans/
+│   │       │   └── opt-out/
+│   │       │       └── initial.js        # Initial dialplan endpoint
+│   │       └── hooks/
+│   │           └── collect/
+│   │               └── opt-out.js        # Collect endpoint (eventURL)
+│   ├── index.js                          # Home page
+│   └── monitor.js                        # Monitoring dashboard
+├── README.md
+└── DEVELOPER_GUIDE.md                    # Comprehensive developer guide
 ```
 
 ## Deployment
@@ -114,22 +202,75 @@ No additional environment variables are required. The application uses:
 curl -X GET https://your-app.vercel.app/api/voice/dialplans/opt-out/initial
 ```
 
-### Test Collect Webhook
+### Test Collect Endpoint
 ```bash
 curl -X POST https://your-app.vercel.app/api/voice/hooks/collect/opt-out?attempt=1 \
   -H "Content-Type: application/json" \
-  -d '{"digits": "1"}'
+  -d '{
+    "collectedTones": "1",
+    "from": "+1234567890",
+    "to": "+1800XXXYYYY",
+    "messageId": "test-msg-123",
+    "conversationTrackingId": "test-conv-123"
+  }'
 ```
+
+## Routee Configuration
+
+### Configure Your Routee Number
+
+1. **Log into Routee Dashboard**
+   - Navigate to **Voice > Numbers** (or **Number / My numbers**)
+
+2. **Configure Inbound Call Settings**
+   - Click on your number to edit settings
+   - Navigate to **Inbound Call Settings** section
+   - In the **Forward to** dropdown, select: `Dialplan`
+   - In the **Dialplan URL** field, enter:
+     ```
+     https://your-app.vercel.app/api/voice/dialplans/opt-out/initial
+     ```
+   - Save the configuration
+
+3. **Test Your Configuration**
+   - Call your Routee number
+   - Verify the IVR flow works as expected
+
+## Monitoring Dashboard
+
+Access the real-time monitoring dashboard at:
+```
+https://your-app.vercel.app/monitor
+```
+
+**Features:**
+- View all incoming requests in real-time
+- See request/response details
+- Auto-refresh every 3 seconds
+- Clear logs functionality
+- Track call flow and debugging information
 
 ## Audio Files
 
-The following audio files are expected to be hosted at `https://waymore.io/recordings/`:
+The following audio files are currently hosted on CDN:
 
-- `Opt_out_Voice_message_upon_dialling_TFN.wav` - Initial opt-out message
-- `no_input.wav` - No input timeout message
-- `opt_out_confirmed.wav` - Successful opt-out confirmation
-- `first_invalid_opt_out.wav` - First invalid input retry message
-- `second_invalid_opt_out.wav` - Final invalid input message
+| File | URL | Purpose |
+|------|-----|---------|
+| **File 1** | `https://cdn12.waymore.io/s/pTXaaw7KDLcjBnt/download/1.wav` | Welcome/initial opt-out message |
+| **File 2** | (Configure in code) | First invalid input retry message |
+| **File 3** | (Configure in code) | Second invalid input message |
+| **File 4** | `https://cdn12.waymore.io/s/yWCEeCTLFK5dQ7Y/download/4.wav` | No input retry message (with hash reminder) |
+| **File 5** | (Configure in code) | Opt-out confirmation message |
+| **File 6** | `https://cdn12.waymore.io/s/NcB6E9Deaecnp94/download/6.wav` | Final no-input/timeout message |
+
+**Audio Requirements:**
+- Format: WAV (preferred) or MP3
+- Sample Rate: 8kHz (phone quality)
+- Channels: Mono
+- Bit Depth: 16-bit
+- Encoding: PCM
+
+**Note:** Update the audio file URLs in your endpoint code (`pages/api/voice/hooks/collect/opt-out.js`) to point to your own CDN or audio hosting service.
 
 ## CIAM Integration
 
@@ -176,6 +317,34 @@ npm run dev
 
 This project is part of the Routee voice opt-out implementation.
 
+## Important Routee Behaviors
+
+⚠️ **Hash Key Requirement:**
+- Routee uses `submitOnHash: true`, which means users **must press the hash (#) key** after entering their digit
+- If a user presses "1" but forgets "#", Routee will **not** POST to the eventURL
+- The call will proceed through the PAUSE and fallback PLAY, then end
+- After the call ends, Routee posts `collectedTones: ""` (empty string)
+- Always instruct users to "press 1 followed by the hash key"
+
+**Field Names:**
+- Routee sends collected digits as `collectedTones`, not `digits`
+- Request includes: `from`, `to`, `messageId`, `conversationTrackingId`
+
+## Documentation
+
+For comprehensive documentation, see:
+- **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)** - Complete technical guide with:
+  - Detailed business logic and call flow
+  - Routee integration details
+  - Implementation examples (JavaScript, Python, PHP, Java)
+  - Troubleshooting guide
+  - Testing strategies
+  - Best practices
+
 ## Support
 
-For issues or questions, please check the Vercel function logs or contact the development team.
+For issues or questions:
+1. Check the Vercel function logs
+2. Review the monitoring dashboard at `/monitor`
+3. Consult the [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)
+4. Contact the development team
