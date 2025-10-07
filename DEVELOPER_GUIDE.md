@@ -177,7 +177,23 @@ Expected response structure:
 
 **Purpose**: Returns the initial dialplan that Routee executes when a call comes in.
 
-**Request**: No body required (Routee may send call metadata)
+**Request Body** (sent by Routee when using POST):
+```json
+{
+  "messageId": "unique-message-identifier",
+  "conversationTrackingId": "unique-conversation-identifier",
+  "from": "+1234567890",
+  "to": "+1800XXXYYYY"
+}
+```
+
+**Field Descriptions**:
+- `messageId`: Unique Routee message identifier
+- `conversationTrackingId`: Unique Routee conversation tracking identifier
+- `from`: Caller's phone number (E.164 format)
+- `to`: Your Routee number (E.164 format)
+
+**Note**: For GET requests, these fields may be sent as query parameters instead of body
 
 **Response**:
 ```json
@@ -665,8 +681,16 @@ PLAY (welcome) → COLLECT starts → User silent
 
 **Initial Request** (Routee to your server):
 ```http
-GET /api/voice/dialplans/opt-out/initial
+POST /api/voice/dialplans/opt-out/initial
 Host: YOUR-DOMAIN.com
+Content-Type: application/json
+
+{
+  "messageId": "msg-abc123",
+  "conversationTrackingId": "conv-xyz789",
+  "from": "+1234567890",
+  "to": "+1800XXXYYYY"
+}
 ```
 
 **Initial Response**:
@@ -683,20 +707,22 @@ Host: YOUR-DOMAIN.com
 }
 ```
 
-**Collect Request** (User pressed "1#"):
+**Collect Request** (User pressed "1#" - Routee POSTs this):
 ```http
 POST /api/voice/hooks/collect/opt-out?attempt=1
-Content-Type: application/json
 Host: YOUR-DOMAIN.com
+Content-Type: application/json
 
 {
   "from": "+1234567890",
   "to": "+1800XXXYYYY",
-  "messageId": "msg-12345",
-  "conversationTrackingId": "conv-67890",
+  "messageId": "msg-abc123",
+  "conversationTrackingId": "conv-xyz789",
   "collectedTones": "1"
 }
 ```
+
+**Field Order Note**: Routee may send fields in any order. The example above shows typical ordering.
 
 **Collect Response**:
 ```json
@@ -715,16 +741,17 @@ Host: YOUR-DOMAIN.com
 
 ### Example 2: Invalid Input with Retry
 
-**Collect Request** (User pressed "9#"):
+**Collect Request** (User pressed "9#" - Routee POSTs this):
 ```http
 POST /api/voice/hooks/collect/opt-out?attempt=1
+Host: YOUR-DOMAIN.com
 Content-Type: application/json
 
 {
   "from": "+1234567890",
   "to": "+1800XXXYYYY",
-  "messageId": "msg-12346",
-  "conversationTrackingId": "conv-67891",
+  "messageId": "msg-def456",
+  "conversationTrackingId": "conv-uvw123",
   "collectedTones": "9"
 }
 ```
@@ -761,16 +788,17 @@ Content-Type: application/json
 
 ### Example 3: No Input (Empty collectedTones)
 
-**Collect Request** (User didn't press anything):
+**Collect Request** (User didn't press anything OR pressed without # - Routee POSTs this when call ends):
 ```http
 POST /api/voice/hooks/collect/opt-out?attempt=1
+Host: YOUR-DOMAIN.com
 Content-Type: application/json
 
 {
   "from": "+1234567890",
   "to": "+1800XXXYYYY",
-  "messageId": "msg-12347",
-  "conversationTrackingId": "conv-67892",
+  "messageId": "msg-ghi789",
+  "conversationTrackingId": "conv-rst456",
   "collectedTones": ""
 }
 ```
