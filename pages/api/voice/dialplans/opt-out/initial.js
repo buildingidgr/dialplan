@@ -36,8 +36,9 @@ export default function handler(req, res) {
         maxDigits: 30
       },
       {
-        type: "PAUSE",
-        duration: 7 // seconds
+        type: "PLAY",
+        fileURL: "https://cdn12.waymore.io/s/299WXiedo2wCp2y/download/4.wav",
+        bargeIn: false
       }
     ]
   };
