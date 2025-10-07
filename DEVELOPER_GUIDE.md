@@ -1941,14 +1941,7 @@ Before going to production, verify:
 - [ ] Monitoring dashboard accessible
 - [ ] Logs showing request/response data
 - [ ] Alerts configured for errors
-- [ ] Performance metrics tracked
-- [ ] CIAM integration status monitored
 
-### Documentation
-- [ ] Internal documentation updated
-- [ ] Runbook created for on-call team
-- [ ] Contact information for escalation
-- [ ] Known issues documented
 
 ---
 
