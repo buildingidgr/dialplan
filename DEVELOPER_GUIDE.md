@@ -63,11 +63,12 @@ End Call      ↓              │               │
 
 | ID | Trigger | Purpose | Sample Content |
 |-----|---------|---------|----------------|
-| **WELCOME_MESSAGE** | Initial call | Greet and instruct | "Hello, This is [BRAND]. Thank you for calling. To opt out from SMS campaigns, please press 1 followed by the hash key." |
-| **FIRST_INVALID** | Invalid input (1st) | Retry instruction | "You have selected an invalid option. To opt out from SMS notifications, please press 1 followed by the hash key." |
-| **SECOND_INVALID** | Invalid input (2nd) | Final invalid message | "You have selected an invalid option again. We will now end the call. Please call again. Thank you." |
-| **NO_INPUT** | No input/timeout | Timeout message | "No input was received. We will now end the call. Please call again." |
-| **CONFIRMATION** | Successful opt-out | Confirmation | "Your selection to opt-out from SMS campaigns has been registered. Thank you!" |
+| **1. WELCOME_MESSAGE** | Initial call | Greet and instruct | "Hello, This is [BRAND]. Thank you for calling. To opt out from SMS campaigns, please press 1 followed by the hash key." |
+| **2. FIRST_INVALID** | Invalid input (1st) | Retry instruction | "You have selected an invalid option. To opt out from SMS notifications, please press 1 followed by the hash key." |
+| **3. SECOND_INVALID** | Invalid input (2nd) | Final invalid message | "You have selected an invalid option again. We will now end the call. Please call again. Thank you." |
+| **4. NO_INPUT_RETRY** | No input (1st) | Retry with hash reminder | "No input was received. Please remember to press the hash key after entering your selection. To opt out from SMS campaigns, please press 1 followed by the hash key." |
+| **5. CONFIRMATION** | Successful opt-out | Confirmation | "Your selection to opt out from SMS campaigns has been registered. Thank you for calling. Goodbye." |
+| **6. NO_INPUT_FINAL** | No input (2nd) | Final timeout message | "No input was received again. Please remember to press the hash key after entering your selection. We will now end the call. Please call again. Thank you." |
 
 ---
 
@@ -183,7 +184,7 @@ Expected response structure:
   "verbs": [
     {
       "type": "PLAY",
-      "fileURL": "https://YOUR-CDN.com/welcome-message.wav",
+      "fileURL": "https://YOUR-CDN.com/1-welcome-message.wav",
       "bargeIn": false
     },
     {
@@ -198,7 +199,16 @@ Expected response structure:
     },
     {
       "type": "PLAY",
-      "fileURL": "https://YOUR-CDN.com/no-input-message.wav",
+      "fileURL": "https://YOUR-CDN.com/4-no-input-retry.wav",
+      "bargeIn": false
+    },
+    {
+      "type": "PAUSE",
+      "duration": 7
+    },
+    {
+      "type": "PLAY",
+      "fileURL": "https://YOUR-CDN.com/6-no-input-final.wav",
       "bargeIn": false
     }
   ]
@@ -206,10 +216,14 @@ Expected response structure:
 ```
 
 **Verb Explanation**:
-- `PLAY` (1st): Plays welcome/instruction audio file
+- `PLAY` (1st): Plays welcome/instruction audio file (File 1)
 - `COLLECT`: Waits for user to press keys, submits on # press
-- `PAUSE`: Gives user 7 seconds to respond
-- `PLAY` (2nd): Fallback message if no input received
+- `PAUSE` (1st): Gives user 7 seconds to respond
+- `PLAY` (2nd): First no-input message with hash reminder (File 4)
+- `PAUSE` (2nd): Gives user another 7 seconds to respond
+- `PLAY` (3rd): Final no-input message, ends call (File 6)
+
+**Total Time**: Up to 14 seconds for user to respond (2 x 7-second pauses)
 
 ---
 
@@ -326,7 +340,7 @@ FUNCTION handleInitialDialplan(request):
     "verbs": [
       {
         "type": "PLAY",
-        "fileURL": "https://YOUR-CDN.com/welcome-message.wav",
+        "fileURL": "https://YOUR-CDN.com/1-welcome-message.wav",
         "bargeIn": false
       },
       {
@@ -341,7 +355,16 @@ FUNCTION handleInitialDialplan(request):
       },
       {
         "type": "PLAY",
-        "fileURL": "https://YOUR-CDN.com/no-input-message.wav",
+        "fileURL": "https://YOUR-CDN.com/4-no-input-retry.wav",
+        "bargeIn": false
+      },
+      {
+        "type": "PAUSE",
+        "duration": 7
+      },
+      {
+        "type": "PLAY",
+        "fileURL": "https://YOUR-CDN.com/6-no-input-final.wav",
         "bargeIn": false
       }
     ]
@@ -377,6 +400,14 @@ FUNCTION handleCollectWebhook(request):
   LOG("Collect webhook - attempt:", attempt, "collectedTones:", collectedTones)
   LOG("Full request:", JSON_STRINGIFY(request.body))
   
+  // Handle empty collectedTones (call already ended)
+  IF collectedTones == "":
+    LOG("Empty collectedTones - call already ended, logging for analytics only")
+    response = { "message": "Call already ended, no action needed" }
+    LOG_REQUEST(request, response)
+    RETURN JSON(response, 200)
+  END IF
+  
   // Valid input: "1"
   IF collectedTones == "1":
     // Call CIAM to register opt-out
@@ -395,7 +426,7 @@ FUNCTION handleCollectWebhook(request):
       "verbs": [
         {
           "type": "PLAY",
-          "fileURL": "https://YOUR-CDN.com/confirmation-message.wav",
+          "fileURL": "https://YOUR-CDN.com/5-confirmation-message.wav",
           "bargeIn": false
         }
       ]
@@ -411,7 +442,7 @@ FUNCTION handleCollectWebhook(request):
       "verbs": [
         {
           "type": "PLAY",
-          "fileURL": "https://YOUR-CDN.com/first-invalid-message.wav",
+          "fileURL": "https://YOUR-CDN.com/2-first-invalid-message.wav",
           "bargeIn": false
         },
         {
@@ -426,7 +457,7 @@ FUNCTION handleCollectWebhook(request):
         },
         {
           "type": "PLAY",
-          "fileURL": "https://YOUR-CDN.com/second-invalid-message.wav",
+          "fileURL": "https://YOUR-CDN.com/3-second-invalid-message.wav",
           "bargeIn": false
         }
       ]
@@ -641,10 +672,12 @@ Host: YOUR-DOMAIN.com
 ```json
 {
   "verbs": [
-    { "type": "PLAY", "fileURL": "https://YOUR-CDN.com/welcome-message.wav", "bargeIn": false },
+    { "type": "PLAY", "fileURL": "https://YOUR-CDN.com/1-welcome-message.wav", "bargeIn": false },
     { "type": "COLLECT", "eventUrl": "https://YOUR-DOMAIN.com/api/voice/hooks/collect/opt-out?attempt=1", "submitOnHash": true, "maxDigits": 30 },
     { "type": "PAUSE", "duration": 7 },
-    { "type": "PLAY", "fileURL": "https://YOUR-CDN.com/no-input-message.wav", "bargeIn": false }
+    { "type": "PLAY", "fileURL": "https://YOUR-CDN.com/4-no-input-retry.wav", "bargeIn": false },
+    { "type": "PAUSE", "duration": 7 },
+    { "type": "PLAY", "fileURL": "https://YOUR-CDN.com/6-no-input-final.wav", "bargeIn": false }
   ]
 }
 ```
@@ -670,7 +703,7 @@ Host: YOUR-DOMAIN.com
   "verbs": [
     {
       "type": "PLAY",
-      "fileURL": "https://YOUR-CDN.com/confirmation-message.wav",
+      "fileURL": "https://YOUR-CDN.com/5-confirmation-message.wav",
       "bargeIn": false
     }
   ]
@@ -701,7 +734,7 @@ Content-Type: application/json
   "verbs": [
     {
       "type": "PLAY",
-      "fileURL": "https://YOUR-CDN.com/first-invalid-message.wav",
+      "fileURL": "https://YOUR-CDN.com/2-first-invalid-message.wav",
       "bargeIn": false
     },
     {
@@ -716,7 +749,7 @@ Content-Type: application/json
     },
     {
       "type": "PLAY",
-      "fileURL": "https://YOUR-CDN.com/second-invalid-message.wav",
+      "fileURL": "https://YOUR-CDN.com/3-second-invalid-message.wav",
       "bargeIn": false
     }
   ]
@@ -741,7 +774,14 @@ Content-Type: application/json
 }
 ```
 
-**Response**: Same as invalid input (gives retry on attempt 1)
+**Response**: 
+```json
+{
+  "message": "Call already ended, no action needed"
+}
+```
+
+**Note**: This POST arrives after the call has already ended (after the fallback PLAY verbs executed in the initial dialplan). The webhook logs this for analytics but the response is ignored by Routee since the call is over.
 
 ---
 
@@ -1268,12 +1308,13 @@ Configure these environment variables in your deployment:
 # Base URL for your application
 BASE_URL=https://YOUR-DOMAIN.com
 
-# Audio file URLs
-WELCOME_AUDIO_URL=https://YOUR-CDN.com/welcome-message.wav
-NO_INPUT_AUDIO_URL=https://YOUR-CDN.com/no-input-message.wav
-CONFIRMATION_AUDIO_URL=https://YOUR-CDN.com/confirmation-message.wav
-FIRST_INVALID_AUDIO_URL=https://YOUR-CDN.com/first-invalid-message.wav
-SECOND_INVALID_AUDIO_URL=https://YOUR-CDN.com/second-invalid-message.wav
+# Audio file URLs (6 files required)
+WELCOME_AUDIO_URL=https://YOUR-CDN.com/1-welcome-message.wav
+FIRST_INVALID_AUDIO_URL=https://YOUR-CDN.com/2-first-invalid-message.wav
+SECOND_INVALID_AUDIO_URL=https://YOUR-CDN.com/3-second-invalid-message.wav
+NO_INPUT_RETRY_AUDIO_URL=https://YOUR-CDN.com/4-no-input-retry.wav
+CONFIRMATION_AUDIO_URL=https://YOUR-CDN.com/5-confirmation-message.wav
+NO_INPUT_FINAL_AUDIO_URL=https://YOUR-CDN.com/6-no-input-final.wav
 
 # CIAM Integration
 CIAM_API_URL=https://your-ciam-api.com
