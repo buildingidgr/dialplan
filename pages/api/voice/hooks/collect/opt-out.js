@@ -23,13 +23,15 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
   try {
-    const { digits } = req.body;
+    // Routee sends "collectedTones" not "digits"
+    const collectedTones = req.body.collectedTones || req.body.digits || '';
     const attempt = parseInt(req.query.attempt) || 1;
 
-    console.log(`Collect webhook called - attempt: ${attempt}, digits: "${digits}"`);
+    console.log(`Collect webhook called - attempt: ${attempt}, collectedTones: "${collectedTones}"`);
+    console.log(`Full request body:`, JSON.stringify(req.body));
 
-    // No input (empty digits or timeout)
-    if (!digits || digits === '') {
+    // No input (empty collectedTones or timeout)
+    if (!collectedTones || collectedTones === '') {
       console.log('No input received, playing no_input.wav');
       const response = {
         verbs: [
@@ -44,16 +46,19 @@ export default async function handler(req, res) {
       return res.status(200).json(response);
     }
 
-    // Valid input (digits === "1")
-    if (digits === "1") {
+    // Valid input (collectedTones === "1")
+    if (collectedTones === "1") {
       console.log('Valid opt-out input received, calling CIAM');
       
       // Call CIAM to opt out
       await callCIAMToOptOut({
-        digits,
+        collectedTones,
+        from: req.body.from,
+        to: req.body.to,
+        messageId: req.body.messageId,
+        conversationTrackingId: req.body.conversationTrackingId,
         attempt,
-        timestamp: new Date().toISOString(),
-        phoneNumber: req.body.phoneNumber || 'unknown'
+        timestamp: new Date().toISOString()
       });
 
       const response = {
