@@ -1,3 +1,5 @@
+const { logRequest } = require('../../../../../lib/requestLogger.js');
+
 export default function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,5 +42,6 @@ export default function handler(req, res) {
     ]
   };
 
+  logRequest('/api/voice/dialplans/opt-out/initial', req.method, req.body, req.query, req.headers, response);
   res.status(200).json(response);
 }

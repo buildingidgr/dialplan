@@ -1,4 +1,5 @@
 const { callCIAMToOptOut } = require('../../../../../lib/ciam.js');
+const { logRequest } = require('../../../../../lib/requestLogger.js');
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
     // No input (empty digits or timeout)
     if (!digits || digits === '') {
       console.log('No input received, playing no_input.wav');
-      return res.status(200).json({
+      const response = {
         verbs: [
           {
             type: "PLAY",
@@ -38,7 +39,9 @@ export default async function handler(req, res) {
             bargeIn: false
           }
         ]
-      });
+      };
+      logRequest('/api/voice/hooks/collect/opt-out', req.method, req.body, req.query, req.headers, response);
+      return res.status(200).json(response);
     }
 
     // Valid input (digits === "1")
@@ -53,7 +56,7 @@ export default async function handler(req, res) {
         phoneNumber: req.body.phoneNumber || 'unknown'
       });
 
-      return res.status(200).json({
+      const response = {
         verbs: [
           {
             type: "PLAY",
@@ -61,13 +64,15 @@ export default async function handler(req, res) {
             bargeIn: false
           }
         ]
-      });
+      };
+      logRequest('/api/voice/hooks/collect/opt-out', req.method, req.body, req.query, req.headers, response);
+      return res.status(200).json(response);
     }
 
     // Invalid input handling
     if (attempt === 1) {
       console.log('Invalid input on first attempt, retrying');
-      return res.status(200).json({
+      const response = {
         verbs: [
           {
             type: "PLAY",
@@ -85,11 +90,13 @@ export default async function handler(req, res) {
             maxDigits: 30
           }
         ]
-      });
+      };
+      logRequest('/api/voice/hooks/collect/opt-out', req.method, req.body, req.query, req.headers, response);
+      return res.status(200).json(response);
     } else {
       // Invalid input on second attempt
       console.log('Invalid input on second attempt, ending call');
-      return res.status(200).json({
+      const response = {
         verbs: [
           {
             type: "PLAY",
@@ -97,7 +104,9 @@ export default async function handler(req, res) {
             bargeIn: false
           }
         ]
-      });
+      };
+      logRequest('/api/voice/hooks/collect/opt-out', req.method, req.body, req.query, req.headers, response);
+      return res.status(200).json(response);
     }
 
   } catch (error) {
