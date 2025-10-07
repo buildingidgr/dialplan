@@ -98,17 +98,76 @@ This is the eventURL endpoint that handles collected tones from Routee and manag
 }
 ```
 
-**Flow Logic:**
-- **No Input (collectedTones=""):** Logs for analytics (call already ended)
-- **Valid Input (collectedTones="1"):** Calls CIAM and plays confirmation
-- **Invalid Input (attempt=1):** Plays retry message and collects again
-- **Invalid Input (attempt=2):** Plays final invalid message
+**Response Examples:**
+
+**1. Valid Input (collectedTones="1"):**
+```json
+{
+  "verbs": [
+    {
+      "type": "PLAY",
+      "fileURL": "https://cdn12.waymore.io/s/btzr8e5RDADzR9p/download/5.wav",
+      "bargeIn": false
+    }
+  ]
+}
+```
+Also calls CIAM to register the opt-out.
+
+**2. Invalid Input (attempt=1):**
+```json
+{
+  "verbs": [
+    {
+      "type": "PLAY",
+      "fileURL": "https://cdn12.waymore.io/s/ezLYj4bpG6mmBty/download/2.wav",
+      "bargeIn": false
+    },
+    {
+      "type": "COLLECT",
+      "eventUrl": "https://YOUR-VERCEL-APP.vercel.app/api/voice/hooks/collect/opt-out?attempt=2",
+      "submitOnHash": true,
+      "maxDigits": 30
+    },
+    {
+      "type": "PAUSE",
+      "duration": 7
+    },
+    {
+      "type": "PLAY",
+      "fileURL": "https://cdn12.waymore.io/s/Z78YoYbRwjMMZBk/download/3.wav",
+      "bargeIn": false
+    }
+  ]
+}
+```
+
+**3. Invalid Input (attempt=2):**
+```json
+{
+  "verbs": [
+    {
+      "type": "PLAY",
+      "fileURL": "https://cdn12.waymore.io/s/Z78YoYbRwjMMZBk/download/3.wav",
+      "bargeIn": false
+    }
+  ]
+}
+```
+
+**4. Empty Input (call already ended):**
+```json
+{
+  "message": "Call already ended, no action needed"
+}
+```
+This is logged for analytics purposes only.
 
 ### 3. Monitoring Logs API
-**Endpoint:** `GET /api/monitor/logs`  
-**Method:** `GET`
+**Endpoint:** `/api/monitor/logs`  
+**Methods:** `GET`, `DELETE`
 
-Returns all logged requests for monitoring and debugging.
+**GET** - Returns all logged requests for monitoring and debugging.
 
 **Response:**
 ```json
@@ -128,6 +187,15 @@ Returns all logged requests for monitoring and debugging.
 }
 ```
 
+**DELETE** - Clears all logs.
+
+**Response:**
+```json
+{
+  "message": "Logs cleared"
+}
+```
+
 ### 4. Health Check
 **Endpoint:** `GET /api/ping`  
 **Method:** `GET`
@@ -137,8 +205,7 @@ Simple health check endpoint.
 **Response:**
 ```json
 {
-  "status": "ok",
-  "timestamp": "2025-10-07T09:30:23.456Z"
+  "ok": true
 }
 ```
 
@@ -215,6 +282,20 @@ curl -X POST https://your-app.vercel.app/api/voice/hooks/collect/opt-out?attempt
   }'
 ```
 
+### Test Health Check
+```bash
+curl -X GET https://your-app.vercel.app/api/ping
+```
+
+### Test Monitoring Logs
+```bash
+# Get logs
+curl -X GET https://your-app.vercel.app/api/monitor/logs
+
+# Clear logs
+curl -X DELETE https://your-app.vercel.app/api/monitor/logs
+```
+
 ## Routee Configuration
 
 ### Configure Your Routee Number
@@ -254,14 +335,14 @@ https://your-app.vercel.app/monitor
 
 The following audio files are currently hosted on CDN:
 
-| File | URL | Purpose |
-|------|-----|---------|
-| **File 1** | `https://cdn12.waymore.io/s/pTXaaw7KDLcjBnt/download/1.wav` | Welcome/initial opt-out message |
-| **File 2** | (Configure in code) | First invalid input retry message |
-| **File 3** | (Configure in code) | Second invalid input message |
-| **File 4** | `https://cdn12.waymore.io/s/yWCEeCTLFK5dQ7Y/download/4.wav` | No input retry message (with hash reminder) |
-| **File 5** | (Configure in code) | Opt-out confirmation message |
-| **File 6** | `https://cdn12.waymore.io/s/NcB6E9Deaecnp94/download/6.wav` | Final no-input/timeout message |
+| File | URL | Purpose | Used In |
+|------|-----|---------|---------|
+| **File 1** | `https://cdn12.waymore.io/s/pTXaaw7KDLcjBnt/download/1.wav` | Welcome/initial opt-out message | Initial dialplan |
+| **File 2** | `https://cdn12.waymore.io/s/ezLYj4bpG6mmBty/download/2.wav` | First invalid input retry message | Collect (attempt 1, invalid) |
+| **File 3** | `https://cdn12.waymore.io/s/Z78YoYbRwjMMZBk/download/3.wav` | Second invalid input / final message | Collect (attempt 2, invalid) |
+| **File 4** | `https://cdn12.waymore.io/s/yWCEeCTLFK5dQ7Y/download/4.wav` | No input retry message (with hash reminder) | Initial dialplan (1st timeout) |
+| **File 5** | `https://cdn12.waymore.io/s/btzr8e5RDADzR9p/download/5.wav` | Opt-out confirmation message | Collect (valid input) |
+| **File 6** | `https://cdn12.waymore.io/s/NcB6E9Deaecnp94/download/6.wav` | Final no-input/timeout message | Initial dialplan (2nd timeout) |
 
 **Audio Requirements:**
 - Format: WAV (preferred) or MP3
@@ -270,7 +351,7 @@ The following audio files are currently hosted on CDN:
 - Bit Depth: 16-bit
 - Encoding: PCM
 
-**Note:** Update the audio file URLs in your endpoint code (`pages/api/voice/hooks/collect/opt-out.js`) to point to your own CDN or audio hosting service.
+**Note:** All audio files are configured in the code. Update the URLs in `pages/api/voice/dialplans/opt-out/initial.js` and `pages/api/voice/hooks/collect/opt-out.js` to point to your own CDN or audio hosting service if needed.
 
 ## CIAM Integration
 
