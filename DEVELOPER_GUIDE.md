@@ -244,11 +244,11 @@ Expected response structure:
 
 ---
 
-### 2. Collect Webhook Endpoint
+### 2. Collect Endpoint (eventURL)
 
 **URL**: `POST /api/voice/hooks/collect/opt-out?attempt={1|2}`
 
-**Purpose**: Receives collected tones from Routee and returns appropriate response.
+**Purpose**: This is the eventURL endpoint that receives collected tones from Routee and returns appropriate response.
 
 **Request Body** (sent by Routee):
 ```json
@@ -392,7 +392,7 @@ FUNCTION handleInitialDialplan(request):
 END FUNCTION
 ```
 
-#### Step 2: Implement Collect Webhook Endpoint
+#### Step 2: Implement Collect Endpoint (eventURL)
 
 **Endpoint**: `POST /api/voice/hooks/collect/opt-out?attempt={1|2}`
 
@@ -414,7 +414,7 @@ FUNCTION handleCollectWebhook(request):
   baseUrl = ENV_VAR("BASE_URL") OR "https://YOUR-DOMAIN.com"
   
   // Log for debugging
-  LOG("Collect webhook - attempt:", attempt, "collectedTones:", collectedTones)
+  LOG("Collect endpoint - attempt:", attempt, "collectedTones:", collectedTones)
   LOG("Full request:", JSON_STRINGIFY(request.body))
   
   // Handle empty collectedTones (call already ended)
@@ -554,24 +554,24 @@ END FUNCTION
 
 1. **Hash Key Requirement**: 
    - When `submitOnHash: true` is set, Routee **will NOT POST to the eventURL** unless the user presses the hash key (`#`)
-   - **This means**: If a user presses "1" but forgets to press "#", you will receive NO webhook call
+   - **This means**: If a user presses "1" but forgets to press "#", Routee will not POST to your eventURL endpoint
    - The PAUSE verb will complete, the fallback PLAY will execute, and the call will end
    - **Developer Impact**: You cannot track partial input. You'll only receive complete submissions (with #) or empty/timeout submissions
    - **User Instructions**: Always instruct users to "press 1 followed by the hash key" in your audio messages
 
-3. **Empty Input Behavior**: 
+2. **Empty Input Behavior**: 
    - Routee posts `collectedTones: ""` **when the call ends**
    - This happens if the user doesn't press "#" before the dialplan completes
    - The PAUSE → fallback PLAY sequence keeps the call alive long enough for users to respond
    - Empty `collectedTones` indicates the user didn't complete input (either pressed digits without "#" or pressed nothing at all)
 
-4. **Timing**: If call ends before PAUSE completes, Routee may not POST to webhook at all
+3. **Timing**: If call ends before PAUSE completes, Routee may not POST to the eventURL at all
 
 ### Solution for Timing Issue
 
 The dialplan structure `PLAY → COLLECT → PAUSE → PLAY` ensures:
 - User has 7 seconds to respond during PAUSE
-- If user presses "1#", Routee interrupts and POSTs to webhook
+- If user presses "1#", Routee interrupts and POSTs to eventURL
 - If no input, fallback PLAY executes and call ends gracefully
 - This prevents premature call termination
 
@@ -582,11 +582,11 @@ Scenario 1: User presses "1#" (CORRECT)
 ───────────────────────────────────────
 PLAY (welcome) → COLLECT starts → User presses "1#"
                                       ↓
-                        Routee immediately POSTs to webhook
+                        Routee immediately POSTs to eventURL
                                       ↓
                         POST { "collectedTones": "1" }
                                       ↓
-                        Webhook returns PLAY(confirmation)
+                        eventURL endpoint returns PLAY(confirmation)
                                       ↓
                         Call ends with confirmation
 
@@ -611,7 +611,7 @@ PLAY (welcome) → COLLECT starts → User presses "1" (no #)
                                       ↓
                         Routee POSTs { "collectedTones": "" }
                                       ↓
-                        Webhook receives empty input
+                        eventURL endpoint receives empty input
                         (but call already ended - too late to respond)
 
 
@@ -635,20 +635,20 @@ PLAY (welcome) → COLLECT starts → User silent
                                       ↓
                         Routee POSTs { "collectedTones": "" }
                                       ↓
-                        Webhook receives empty input
+                        eventURL endpoint receives empty input
                         (but call already ended - too late to respond)
 ```
 
 **Key Takeaways**: 
 - Routee only POSTs when the **call ends** or when user presses "#"
-- Without hash key, Scenarios 2 and 3 are identical to your webhook
+- Without hash key, Scenarios 2 and 3 are identical to your eventURL endpoint
 - The empty `collectedTones` POST arrives **after the call has ended**
 - You cannot respond to empty submissions - the fallback PLAY already executed
 - This is why the fallback PLAY is essential - it handles the no-input case within the call flow
 
 **Important for Developers**:
 - When you receive `collectedTones: ""`, the call has already ended
-- Your webhook response will be **ignored** by Routee (call is over)
+- Your eventURL endpoint response will be **ignored** by Routee (call is over)
 - This POST is informational only - log it for analytics but don't try to respond
 - The actual user experience was already handled by the fallback PLAY in the dialplan
 - This is why we include fallback audio in the initial dialplan structure
@@ -790,7 +790,7 @@ Content-Type: application/json
 }
 ```
 
-**Note**: This POST arrives after the call has already ended (after the fallback PLAY verbs executed in the initial dialplan). The webhook logs this for analytics but the response is ignored by Routee since the call is over.
+**Note**: This POST arrives after the call has already ended (after the fallback PLAY verbs executed in the initial dialplan). The eventURL endpoint logs this for analytics but the response is ignored by Routee since the call is over.
 
 ---
 
@@ -829,12 +829,12 @@ app.get('/api/voice/dialplans/opt-out/initial', (req, res) => {
   });
 });
 
-// Collect Webhook
+// Collect Endpoint (eventURL)
 app.post('/api/voice/hooks/collect/opt-out', async (req, res) => {
   const { collectedTones, from, to, messageId, conversationTrackingId } = req.body;
   const attempt = parseInt(req.query.attempt) || 1;
 
-  console.log(`Collect webhook - attempt: ${attempt}, collectedTones: "${collectedTones}"`);
+  console.log(`Collect endpoint - attempt: ${attempt}, collectedTones: "${collectedTones}"`);
 
   // Valid input
   if (collectedTones === "1") {
@@ -938,12 +938,12 @@ def initial_dialplan():
     return jsonify(response)
 
 @app.route('/api/voice/hooks/collect/opt-out', methods=['POST'])
-def collect_webhook():
+def collect_endpoint():
     data = request.get_json()
     collected_tones = data.get('collectedTones', '')
     attempt = int(request.args.get('attempt', 1))
     
-    logging.info(f"Collect webhook - attempt: {attempt}, collectedTones: {collected_tones}")
+    logging.info(f"Collect endpoint - attempt: {attempt}, collectedTones: {collected_tones}")
     logging.info(f"Full request: {data}")
     
     # Valid input
@@ -1504,7 +1504,7 @@ logToMonitoring("opt-out-invalid", { phoneNumber: from, attempt: attempt, input:
 
 ## Troubleshooting
 
-### Issue 1: Routee Not Posting to Webhook
+### Issue 1: Routee Not Posting to eventURL Endpoint
 
 **Symptoms**: 
 - User presses "1#" but doesn't hear confirmation message
@@ -1512,22 +1512,25 @@ logToMonitoring("opt-out-invalid", { phoneNumber: from, attempt: attempt, input:
 
 **Diagnostic Steps**:
 1. Check monitoring dashboard for incoming requests
-2. Verify webhook URL in Routee application settings
-3. Test webhook URL manually with curl
-4. Check server logs for connection attempts
+2. Verify Dialplan URL in Routee number settings (Voice > Numbers)
+3. Verify eventURL in your initial dialplan response
+4. Test eventURL endpoint manually with curl
+5. Check server logs for connection attempts
 
 **Possible Causes**:
-- Webhook URL incorrect in Routee config
+- Dialplan URL incorrect in Routee config
+- eventURL incorrect in your dialplan response
 - Firewall blocking Routee IPs
 - SSL certificate issues
 - Network connectivity problems
 
 **Solutions**:
-1. Verify exact webhook URL matches your endpoint
-2. Whitelist Routee IP addresses if firewall enabled
-3. Ensure valid SSL certificate (required for HTTPS)
-4. Test endpoint accessibility from external network
-5. Check CORS headers are properly set
+1. Verify exact Dialplan URL in Routee number settings
+2. Verify exact eventURL in your initial dialplan response
+3. Whitelist Routee IP addresses if firewall enabled
+4. Ensure valid SSL certificate (required for HTTPS)
+5. Test endpoint accessibility from external network
+6. Check CORS headers are properly set
 
 ---
 
@@ -1536,7 +1539,7 @@ logToMonitoring("opt-out-invalid", { phoneNumber: from, attempt: attempt, input:
 **Symptoms**: 
 - Routee always posts `collectedTones: ""`
 - Even when user reports pressing "1"
-- No webhook POST received when user presses digit without "#"
+- No POST to eventURL received when user presses digit without "#"
 
 **Diagnostic Steps**:
 1. Check if `submitOnHash` is set to `true`
@@ -1549,10 +1552,10 @@ logToMonitoring("opt-out-invalid", { phoneNumber: from, attempt: attempt, input:
 ⚠️ **Most Common**: User is pressing "1" but **NOT pressing the hash key (#)**
 
 When `submitOnHash: true`:
-- Routee **will NOT POST** to webhook until "#" is pressed
+- Routee **will NOT POST** to eventURL until "#" is pressed
 - If "#" is never pressed, Routee waits through entire dialplan (COLLECT → PAUSE → fallback PLAY)
 - **When the call ends** (after fallback PLAY completes), Routee posts `collectedTones: ""` (empty)
-- This empty POST arrives **after** the call has already ended, so your webhook response is ignored
+- This empty POST arrives **after** the call has already ended, so your eventURL response is ignored
 - From your logs, this looks like "no input", but the user may have pressed "1" (you can't tell)
 
 **Possible Causes**:
@@ -1581,7 +1584,7 @@ When `submitOnHash: true`:
 
 **Symptoms**: 
 - Call disconnects before user can enter input
-- No webhook POST received
+- No POST to eventURL received
 
 **Diagnostic Steps**:
 1. Verify PAUSE verb exists after COLLECT
@@ -1755,17 +1758,17 @@ Set up alerts for critical issues:
 - Invalid input rate
 - Average call duration
 - CIAM API latency
-- Webhook response time
+- API endpoint response time
 
 ### 4. Security Considerations
 
-**Validate Webhook Source**:
+**Validate Request Source**:
 ```pseudo
-FUNCTION validateRouteeWebhook(request):
+FUNCTION validateRouteeRequest(request):
   // Option 1: IP Whitelist
   allowedIPs = ["ROUTEE_IP_1", "ROUTEE_IP_2", "ROUTEE_IP_3"]
   IF request.ip NOT IN allowedIPs:
-    LOG_SECURITY("Unauthorized webhook attempt from:", request.ip)
+    LOG_SECURITY("Unauthorized request attempt from:", request.ip)
     RETURN 403_FORBIDDEN
   END IF
   
@@ -1876,7 +1879,7 @@ END FUNCTION
 
 **Async Processing**:
 ```pseudo
-FUNCTION handleCollectWebhook(request):
+FUNCTION handleCollectEndpoint(request):
   // Parse request
   data = PARSE_REQUEST(request)
   
@@ -1919,9 +1922,9 @@ Before going to production, verify:
 - [ ] Audio files tested (8kHz, mono, WAV format)
 - [ ] Environment variables configured
 - [ ] CIAM API integration tested
-- [ ] Toll-free number purchased
-- [ ] Routee application configured
-- [ ] Webhook URLs verified
+- [ ] Number purchased in Routee
+- [ ] Dialplan URL configured in Routee number settings
+- [ ] eventURL in initial dialplan response verified
 - [ ] CORS headers enabled
 - [ ] SSL certificate valid
 
@@ -1970,12 +1973,12 @@ Before going to production, verify:
 ```json
 {
   "type": "COLLECT",
-  "eventUrl": "https://YOUR-DOMAIN.com/webhook-endpoint",
+  "eventUrl": "https://YOUR-DOMAIN.com/api/voice/hooks/collect/opt-out",
   "submitOnHash": true,
   "maxDigits": 30
 }
 ```
-- `eventUrl`: Webhook URL where Routee will POST collected tones
+- `eventUrl`: Your endpoint URL where Routee will POST collected tones
 - `submitOnHash`: 
   - `true` - Submit when user presses `#` (recommended)
   - `false` - Submit after maxDigits reached
@@ -2094,7 +2097,7 @@ ENABLE_RATE_LIMITING=true
 
 **Integration Tests**:
 - [ ] Initial dialplan returns correct JSON structure
-- [ ] Webhook receives POST from Routee
+- [ ] eventURL endpoint receives POST from Routee
 - [ ] CIAM receives opt-out data
 - [ ] Monitoring logs capture all requests
 - [ ] Error cases handled gracefully
@@ -2106,7 +2109,7 @@ ENABLE_RATE_LIMITING=true
 - [ ] Database connections managed properly
 
 **Security Tests**:
-- [ ] Webhook only accepts POST method
+- [ ] eventURL endpoint only accepts POST method
 - [ ] Rate limiting prevents abuse
 - [ ] Input validation prevents injection
 - [ ] CORS headers properly configured
@@ -2120,7 +2123,7 @@ ENABLE_RATE_LIMITING=true
 - Voice API: https://docs.routee.net/docs/voice-api
 - Voice Verbs: https://docs.routee.net/docs/voice-verbs
 - COLLECT Verb: https://docs.routee.net/docs/collect-verb
-- Webhooks: https://docs.routee.net/docs/voice-webhooks
+- Voice Dialplans: https://docs.routee.net/docs/voice-dialplans
 
 ### Contact Support
 
@@ -2154,7 +2157,7 @@ For technical issues:
 ## FAQ
 
 **Q: Why do we need PAUSE after COLLECT?**  
-A: The PAUSE gives users 7 seconds to press keys. Without it, the call would proceed immediately to the next verb (ending the call). During the PAUSE, if the user presses "1#", Routee interrupts the flow and POSTs to the webhook.
+A: The PAUSE gives users 7 seconds to press keys. Without it, the call would proceed immediately to the next verb (ending the call). During the PAUSE, if the user presses "1#", Routee interrupts the flow and POSTs to the eventURL.
 
 **Q: Why is there a PLAY after PAUSE?**  
 A: This is the fallback message that plays if the user doesn't respond during the PAUSE. It ensures the call ends gracefully with appropriate messaging rather than just disconnecting.
@@ -2176,7 +2179,7 @@ A: **CRITICAL**: With `submitOnHash: true`, Routee will **NOT POST to the eventU
 2. PAUSE duration completes (7 seconds)
 3. Fallback PLAY executes (no-input or invalid message)
 4. Call ends
-5. **No webhook POST is sent** - you never receive the "1" that was pressed
+5. **No POST to eventURL is sent** - you never receive the "1" that was pressed
 
 **What you receive instead**:
 - After PAUSE completes without "#", Routee posts `collectedTones: ""` (empty)
