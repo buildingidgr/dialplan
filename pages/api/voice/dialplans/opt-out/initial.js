@@ -30,14 +30,14 @@ export default function handler(req, res) {
         bargeIn: false
       },
       {
-        type: "PAUSE",
-        duration: 7 // seconds
-      },
-      {
         type: "COLLECT",
         eventUrl: `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://YOUR-VERCEL-APP.vercel.app'}/api/voice/hooks/collect/opt-out?attempt=1`,
         submitOnHash: true,
         maxDigits: 30
+      },
+      {
+        type: "PAUSE",
+        duration: 7 // seconds
       }
     ]
   };
