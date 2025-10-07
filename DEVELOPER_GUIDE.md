@@ -66,7 +66,7 @@ End Call      ↓              │               │
 | **1. WELCOME_MESSAGE** | Initial call | Greet and instruct | "Hello, This is [BRAND]. Thank you for calling. To opt out from SMS campaigns, please press 1 followed by the hash key." |
 | **2. FIRST_INVALID** | Invalid input (1st) | Retry instruction | "You have selected an invalid option. To opt out from SMS notifications, please press 1 followed by the hash key." |
 | **3. SECOND_INVALID** | Invalid input (2nd) | Final invalid message | "You have selected an invalid option again. We will now end the call. Please call again. Thank you." |
-| **4. NO_INPUT_RETRY** | No input (1st) | Retry with hash reminder | "No input was received. Please remember to press the hash key after entering your selection. To opt out from SMS campaigns, please press 1 followed by the hash key." |
+| **4. NO_INPUT_RETRY** | No input (1st) | Hash key reminder | "We did not receive your selection. If you already pressed a number, please press only the hash key now to submit. If not, please press 1 followed by the hash key." |
 | **5. CONFIRMATION** | Successful opt-out | Confirmation | "Your selection to opt out from SMS campaigns has been registered. Thank you for calling. Goodbye." |
 | **6. NO_INPUT_FINAL** | No input (2nd) | Final timeout message | "No input was received again. Please remember to press the hash key after entering your selection. We will now end the call. Please call again. Thank you." |
 
